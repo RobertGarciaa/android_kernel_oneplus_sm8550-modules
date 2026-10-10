@@ -7,6 +7,7 @@
  */
 #include <dsi_drm.h>
 #include <sde_trace.h>
+#include <soc/oplus/system/oplus_project.h>
 #include "dsi_panel.h"
 #include "dsi_iris.h"
 #include "dsi_iris_api.h"
@@ -427,9 +428,11 @@ static uint32_t _iris_get_timing_index(const struct dsi_mode_info *timing)
 	for (i = 0; i < panel_tm_num; i++) {
 		struct dsi_mode_info *t = &panel_tm_arry[i];
 
+		/* Distinguish salami CN SA/OA modes without changing other projects. */
 		if (timing->v_active == t->v_active &&
 				timing->h_active == t->h_active &&
-				timing->refresh_rate == t->refresh_rate)
+				timing->refresh_rate == t->refresh_rate &&
+				(!is_project(22811) || timing->h_skew == t->h_skew))
 			return i;
 	}
 
