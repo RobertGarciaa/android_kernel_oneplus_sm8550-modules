@@ -13,6 +13,7 @@
 #include "dsi_display.h"
 #include "sde_trace.h"
 #include "sde_encoder_phys.h"
+#include <soc/oplus/system/oplus_project.h>
 
 #ifdef OPLUS_FEATURE_DISPLAY_ONSCREENFINGERPRINT
 #include "oplus_onscreenfingerprint.h"
@@ -1448,15 +1449,12 @@ static int oplus_adfr_auto_mode_update(void *dsi_display, unsigned int auto_mode
 /* prevent the wrong min fps setting */
 static int oplus_adfr_min_fps_check(void *dsi_panel, unsigned int min_fps)
 {
-#if 0
 	unsigned char min_fps_mapping_table_count = 0;
 	unsigned int refresh_rate = 120;
 	unsigned int h_skew = STANDARD_ADFR;
 	unsigned int idle_off_min_fps = 0;
 	struct dsi_panel *panel = dsi_panel;
 	struct oplus_adfr_params *p_oplus_adfr_params = NULL;
-#endif
-	struct dsi_panel *panel = dsi_panel;
 
 	ADFR_DEBUG("start\n");
 
@@ -1472,7 +1470,10 @@ static int oplus_adfr_min_fps_check(void *dsi_panel, unsigned int min_fps)
 	}
 #endif /* CONFIG_PXLW_IRIS */
 
-#if 0
+	/* Keep the existing kickstart behavior on other projects. */
+	if (!is_project(22811))
+		return 1;
+
 	p_oplus_adfr_params = oplus_adfr_get_params(panel);
 	if (!p_oplus_adfr_params) {
 		ADFR_ERR("invalid p_oplus_adfr_params param\n");
@@ -1524,9 +1525,6 @@ static int oplus_adfr_min_fps_check(void *dsi_panel, unsigned int min_fps)
 	ADFR_DEBUG("end\n");
 
 	return min_fps;
-#else
-	return 1;
-#endif
 }
 
 static int oplus_adfr_min_fps_update(void *dsi_display, unsigned int min_fps)
@@ -5551,6 +5549,7 @@ ssize_t oplus_adfr_set_config_attr(struct kobject *obj,
 	struct kobj_attribute *attr, const char *buf, size_t count)
 {
 	unsigned int config = 0;
+	unsigned int panel_config = 0;
 	struct dsi_display *display = oplus_display_get_current_display();
 	struct oplus_adfr_params *p_oplus_adfr_params = NULL;
 
@@ -5577,6 +5576,12 @@ ssize_t oplus_adfr_set_config_attr(struct kobject *obj,
 	OPLUS_ADFR_TRACE_BEGIN("oplus_adfr_set_adfr_config_attr");
 
 	sscanf(buf, "%x", &config);
+
+	/* Preserve salami CN's panel-declared OA/backlight exclusion. */
+	if (is_project(22811) && OPLUS_ADFR_GET_GLOBAL_CONFIG(config) &&
+			!display->panel->utils.read_u32(display->panel->utils.data,
+					"oplus,adfr-config", &panel_config))
+		config |= panel_config & OPLUS_ADFR_CONFIG_OA_BL_MUTUAL_EXCLUSION;
 
 	p_oplus_adfr_params->config = config;
 	ADFR_INFO("oplus_adfr_config:0x%x\n", p_oplus_adfr_params->config);
